@@ -1,88 +1,86 @@
-# String Calculator Kata — Complete Beginner's TDD Walkthrough
+# String Calculator Kata — Python `unittest` TDD Guide
 
-> **Repository:** [SLMakomazi/string-calculator-kata](https://github.com/SLMakomazi/string-calculator-kata)  
-> **Language:** Python 3.13 • **Test runner:** pytest 8.4.2  
-> **Source of truth:** `calculator.py` and `tests/test_calculator.py` on `main`, reviewed after commit `154f14e`.  
-> **Observed result:** 21 passed (terminal output supplied by the developer).
+This guide documents the **current class-based `unittest` approach** in [this repository](https://github.com/SLMakomazi/string-calculator-kata). It follows the requirements in the order of the 21 tests in `tests/test_calculator.py`, explaining RED → GREEN → REFACTOR and the code in `calculator.py`.
 
-## 1. What the project does
+> **History:** The project originally used pytest-style free functions. The developer switched to `unittest.TestCase` with `self.assertEqual` and `self.assertRaisesRegex`. This guide explains the new version. Intermediate RED/GREEN snippets are teaching reconstructions, **not claims that each version was separately committed**. The final repository code implements all 21 scenarios.
 
-We built one function, `add(numbers)`, where **the input is a string** and **the output is an integer**. It accepts numbers separated by commas, newlines, or an explicitly declared delimiter. It rejects negative values and ignores positive values above 1000.
+## 1. Getting started
 
-Examples:
-
-```python
-add("")                        # 0
-add("5")                       # 5
-add("1,2,3")                   # 6
-add("1\n2,3")                  # 6
-add("//;\n1;2")                # 3
-add("//[***]\n1***2***3")      # 6
-add("//[*][%]\n1*2%3")         # 6
-add("2,1001")                  # 2
-add("2,1000")                  # 1002
-add("1,-2,3")                  # raises ValueError
-```
-
-**The input `"5"` is text, not the integer `5`.** That is why we eventually use `int(value)`.
-
-### File layout
+### Project structure
 
 ```text
 string-calculator-kata/
-├── calculator.py             # actual implementation
+├── calculator.py             # production code: add(numbers)
 ├── tests/
-│   └── test_calculator.py    # checks what the function must do
-├── requirements.txt          # pytest and related dependencies
-└── TDD_WALKTHROUGH.md        # this teaching guide
+│   └── test_calculator.py    # unittest.TestCase and 21 tests
+├── requirements.txt          # previous pytest dependency remains optional
+└── TDD_WALKTHROUGH.md        # this guide
 ```
 
-Your learning scratch file `practise.py` was used earlier for Python basics; it is not part of the calculator's automated test suite.
+`unittest` comes with Python: **no additional test library is needed**.
+
+From the project root, with your virtual environment activated:
+
+```bash
+python -m unittest discover -s tests -p "test_*.py" -v
+```
+
+Or, if you want to run the test file directly:
+
+```bash
+python tests/test_calculator.py
+```
+
+Expected result after all changes: **21 tests, OK**. `pytest` may also discover `unittest.TestCase` tests if installed, but the primary runner for this approach is `unittest`.
+
+### Anatomy of a test
+
+```python
+import unittest
+from calculator import add
+
+
+class TestCalculator(unittest.TestCase):
+    def test_empty_string_returns_zero(self):
+        self.assertEqual(add(""), 0)
+```
+
+- `import unittest`: loads Python's built-in test framework.
+- `from calculator import add`: imports the real function being tested.
+- `class TestCalculator(unittest.TestCase)`: groups related tests into a class inheriting assertion helpers from `TestCase`.
+- `def test_...(self):`: a test method; `self` is the current test-class instance.
+- `self.assertEqual(actual, expected)`: checks that both values are equal. If not, the test **fails**.
+- `self.assertRaisesRegex(ValueError, "message")`: checks that a block raises `ValueError` with a matching message.
+
+**Parameters vs arguments:** `numbers` in `def add(numbers)` is a parameter. `"5"` in `add("5")` is an argument. `return` sends the computed value to the caller; it is not the same as `print()`.
 
 ## 2. TDD: RED → GREEN → REFACTOR
 
-1. **RED:** Write a test expressing the next requirement. Run pytest; ensure it fails for the expected reason. A failure can be an assertion failure or initially a test-collection error, but those are different signals.
-2. **GREEN:** Write the *simplest sufficient* implementation to pass that test **and all earlier tests**.
-3. **REFACTOR:** Make the code easier to understand without changing its behavior; run all tests again.
+**RED:** Add a test for the next requirement, run it, and observe the expected failure.  
+**GREEN:** Write the simplest implementation that makes the new test pass **without breaking older tests**.  
+**REFACTOR:** Simplify or generalize the code, then run the full suite again.
 
 ```bash
-python -m pytest -v           # detailed names + PASS/FAIL
-python -m pytest -q           # brief summary
-python -m pytest -x -v        # stop on first failure
+python -m unittest discover -s tests -v
 ```
 
-`test_...` tells pytest which functions are tests. `assert actual == expected` fails if they differ. `pytest.raises(ValueError)` checks exceptions.
+The output says `FAIL` for a failed assertion, `ERROR` for unexpected exceptions/import errors, and `ok` for passing tests. An `ERROR` during import is not the same as an assertion failure.
 
-> **History note:** These RED/GREEN code samples reconstruct the learning sequence followed in our session. They do **not** claim that each intermediate state exists as its own Git commit. The repository contains the final solution and the 21 tests.
-
-## 3. Starting from zero: the import error and first RED
-
-**Requirement:** An empty string returns zero.
-
-We wrote in `tests/test_calculator.py`:
+## 3. Requirement 1 — Empty input (test 1)
 
 ```python
-from calculator import add
-
-def test_empty_string_returns_zero():
-    result = add("")
-    assert result == 0
+def test_empty_string_returns_zero(self):
+    self.assertEqual(add(""), 0)
 ```
 
-- `from calculator import add` loads the `add` function from `calculator.py`.
-- `result = add("")` supplies an *empty string* argument.
-- `assert result == 0` expresses the required outcome.
-
-**Initial RED:** `calculator.py` was empty, so pytest could not import `add`. It said **`ImportError: cannot import name 'add'`** and **`collected 0 items / 1 error`**. This was an **import/collection error**, not yet a failed assertion.
-
-We added a function stub:
+**RED:** With no `add` function, importing it causes an import error. With a stub:
 
 ```python
 def add(numbers):
     pass
 ```
 
-Now pytest collected the test and reported **`assert None == 0`**. `pass` does nothing; a function without `return` implicitly returns `None`. **This is a genuine failed assertion.**
+the test fails because the function implicitly returns `None`, and `None != 0`.
 
 **GREEN:**
 
@@ -91,19 +89,16 @@ def add(numbers):
     return 0
 ```
 
-Now `add("")` returns 0 and the first test passes. **REFACTOR:** Nothing to simplify yet. It is deliberately not a complete calculator.
+**REFACTOR:** None needed. The one-line solution satisfies only this requirement.
 
-## 4. Single number — test 2
-
-**Requirement:** A string containing one number returns that number.
+## 4. Requirement 2 — Single number (test 2)
 
 ```python
-def test_single_number_returns_its_value():
-    result = add("5")
-    assert result == 5
+def test_single_number_returns_value(self):
+    self.assertEqual(add("5"), 5)
 ```
 
-**RED:** With `return 0`, the assertion says **`assert 0 == 5`**.
+**RED:** `return 0` produces `0` instead of `5`.
 
 **GREEN:**
 
@@ -114,82 +109,81 @@ def add(numbers):
     return int(numbers)
 ```
 
-- `if numbers == ""` handles empty input.
-- `return` stops the function immediately.
-- `int("5")` converts a numeric string to an integer.
+`int("5")` converts text into an integer. **REFACTOR:** No `else` is needed after a `return`, because the function stops at that point.
 
-**REFACTOR:** We do not need an `else` after a branch that returns. The second `return` is reached only when the input is nonempty.
-
-## 5. Comma-separated numbers — tests 3 and 4
+## 5. Requirement 3 — Two comma-separated numbers (test 3)
 
 ```python
-def test_two_numbers():
-    assert add("1,2") == 3
-
-def test_multiple_numbers():
-    assert add("1,2,3,4,5") == 15
+def test_two_numbers(self):
+    self.assertEqual(add("1,2"), 3)
 ```
 
-**RED:** `int("1,2")` raises `ValueError`: a comma-separated string cannot be converted directly to one integer.
+**RED:** `int("1,2")` raises `ValueError`.
 
-**GREEN:**
+**GREEN:** Split the string, convert each piece, and add:
 
 ```python
-def add(numbers):
-    if numbers == "":
-        return 0
-
-    values = numbers.split(",")
-    total = 0
-    for value in values:
-        total += int(value)
-    return total
+values = numbers.split(",")
+total = 0
+for value in values:
+    total += int(value)
+return total
 ```
 
-`"1,2,3".split(",")` becomes `["1", "2", "3"]`. The loop accumulates `0 → 1 → 3 → 6`.
+Keep the early empty-input check. **REFACTOR:** The same loop works for one number, so the separate `return int(numbers)` is no longer needed.
 
-**REFACTOR:** The same loop works for one number (`"5".split(",") == ["5"]`), so the old separate `return int(numbers)` branch is no longer necessary. All the calculation lines must be **indented within the function**; `return` must come **after** the loop.
-
-## 6. Newline separators — tests 5 and 6
+## 6. Requirement 4 — Arbitrary count (test 4)
 
 ```python
-def test_newline_delimiter():
-    assert add("1\n2,3") == 6
-
-def test_multiple_newlines():
-    assert add("1\n2\n3") == 6
+def test_multiple_numbers(self):
+    self.assertEqual(add("1,2,3,4,5"), 15)
 ```
 
-`\n` is the newline character. In `"1\n2,3"`, the input has a newline between 1 and 2.
+**RED:** A two-number-only implementation would fail; the loop-based implementation from test 3 **already passes** this test.
 
-**RED:** Splitting only on commas leaves `"1\n2"` as a chunk; `int("1\n2")` fails.
+**GREEN:** No additional change if you used `split` and `for`. **REFACTOR:** Prefer the general loop to hard-coded `a + b`. The list `["1", "2", "3", "4", "5"]` is processed one element at a time.
 
-**GREEN:** Add this before splitting:
+## 7. Requirement 5 — Mixed newline and comma (test 5)
+
+```python
+def test_newline_delimiter(self):
+    self.assertEqual(add("1\n2,3"), 6)
+```
+
+`\n` is a newline character.
+
+**RED:** Splitting only on commas leaves `"1\n2"` together; integer conversion fails.
+
+**GREEN (intermediate):**
 
 ```python
 numbers = numbers.replace("\n", ",")
 values = numbers.split(",")
 ```
 
-The input `"1\n2,3"` becomes `"1,2,3"`.
+**REFACTOR:** Normalize separators once before the sum, rather than write two separate addition algorithms.
 
-**REFACTOR:** Normalize delimiters rather than duplicating the summation loop. Later, the regex splitter replaces this normalization strategy entirely.
-
-## 7. A custom one-character delimiter — tests 7 and 8
-
-**Input syntax:** `//<delimiter>\n<numbers>`.
+## 8. Requirement 6 — Multiple newlines (test 6)
 
 ```python
-def test_custom_delimiter():
-    assert add("//;\n1;2") == 3
-
-def test_custom_delimiter_with_multiple_numbers():
-    assert add("//|\n1|2|3") == 6
+def test_multiple_newlines(self):
+    self.assertEqual(add("1\n2\n3"), 6)
 ```
 
-**RED:** The comma/newline splitter does not understand the header `//;` or the separator `;`.
+**RED:** Fails if newline handling only replaces one occurrence. **GREEN:** Python's `replace("\n", ",")` replaces **all** occurrences, so the previous implementation already passes. **REFACTOR:** No additional change.
 
-**GREEN (intermediate implementation):**
+## 9. Requirement 7 — One custom delimiter (test 7)
+
+```python
+def test_custom_delimiter(self):
+    self.assertEqual(add("//;\n1;2"), 3)
+```
+
+The syntax is `//<delimiter>\n<numbers>`. The header `//;` declares `;`.
+
+**RED:** The default comma/newline splitter does not parse the header or semicolon.
+
+**GREEN (intermediate):**
 
 ```python
 delimiter = ","
@@ -202,35 +196,32 @@ else:
 values = numbers.split(delimiter)
 ```
 
-- `startswith("//")` detects a custom-delimiter header.
-- `split("\n", 1)` splits at **only the first newline**, separating header from body.
-- `header[2:]` discards the first two characters, `//`. For `"//;"`, that yields `";"`.
-- Then we split the numbers using the chosen delimiter.
+`startswith("//")` detects the header. `split("\n", 1)` splits at the **first** newline. `header[2:]` removes `//`. **REFACTOR:** Keep parsing the header separate from adding the numbers.
 
-**REFACTOR:** Keep header-parsing separate from summing, so later delimiter enhancements do not touch arithmetic.
-
-## 8. Negative numbers — tests 9 and 10
-
-**Requirement:** Never silently accept negative numbers; report **all** negatives.
+## 10. Requirement 8 — Custom delimiter with several values (test 8)
 
 ```python
-def test_single_negative_number():
-    with pytest.raises(ValueError, match="negatives not allowed: -2"):
-        add("1,-2,3")
-
-def test_multiple_negative_numbers():
-    with pytest.raises(ValueError, match="negatives not allowed: -2,-5"):
-        add("1,-2,3,-5")
+def test_custom_delimiter_with_multiple_numbers(self):
+    self.assertEqual(add("//|\n1|2|3"), 6)
 ```
 
-**RED:** Earlier code happily summed negatives: `1 + (-2) + 3 = 2`; `pytest.raises` fails because no exception occurs.
+**RED:** A parser hard-coded for semicolons would fail. **GREEN:** The generic `delimiter = header[2:]` approach already supports `|`. **REFACTOR:** Reuse the existing splitting and sum loop.
 
-**GREEN:** Collect negatives while processing values, then raise after checking every number:
+## 11. Requirement 9 — Reject a negative (test 9)
+
+```python
+def test_single_negative_number(self):
+    with self.assertRaisesRegex(ValueError, "negatives not allowed: -2"):
+        add("1,-2,3")
+```
+
+**RED:** Without validation, `add("1,-2,3")` returns `2` instead of raising.
+
+**GREEN:** Convert values and collect negatives:
 
 ```python
 total = 0
 negatives = []
-
 for value in values:
     number = int(value)
     if number < 0:
@@ -241,31 +232,33 @@ for value in values:
 if negatives:
     negative_list = ",".join(str(n) for n in negatives)
     raise ValueError(f"negatives not allowed: {negative_list}")
-
 return total
 ```
 
-- `[]` is an empty list.
-- `.append(number)` stores a negative.
-- `str(n)` turns each integer back into text for the message.
-- `",".join(...)` builds the text `-2,-5`.
-- `raise ValueError(...)` signals invalid input.
+`with self.assertRaisesRegex(...):` expects an exception inside the indented block. `raise ValueError(...)` creates that exception. **REFACTOR:** Convert each token to `int` only once.
 
-**REFACTOR:** Convert each token to an integer **once**, then reuse `number`. Delay raising until the loop finishes so the error can name every negative. The tests use `match=` (a regex check), not strict whole-string equality.
-
-## 9. Numbers greater than 1000 — tests 11 and 12
+## 12. Requirement 10 — Report every negative (test 10)
 
 ```python
-def test_numbers_greater_than_1000_are_ignored():
-    assert add("2,1001") == 2
-
-def test_1000_is_included():
-    assert add("2,1000") == 1002
+def test_multiple_negative_numbers(self):
+    with self.assertRaisesRegex(ValueError, "negatives not allowed: -2,-5"):
+        add("1,-2,3,-5")
 ```
 
-**RED:** The old loop adds 1001, incorrectly producing 1003 for `"2,1001"`.
+**RED:** A version that raises immediately on the first negative cannot report `-5`.
 
-**GREEN:** Replace the `else` in the summation loop with:
+**GREEN:** Append all negatives during the loop, then raise **after** it. The list `[-2, -5]` becomes the string `"-2,-5"` via `",".join(str(n) for n in negatives)`. **REFACTOR:** One exception reports the entire invalid set.
+
+## 13. Requirement 11 — Ignore numbers above 1000 (test 11)
+
+```python
+def test_numbers_greater_than_1000_are_ignored(self):
+    self.assertEqual(add("2,1001"), 2)
+```
+
+**RED:** The previous sum would be 1003.
+
+**GREEN:** In the loop, replace the plain `else` with:
 
 ```python
 if number < 0:
@@ -274,27 +267,31 @@ elif number <= 1000:
     total += number
 ```
 
-`elif` means “otherwise, if …”. A value **equal to** 1000 is counted; 1001 and larger are skipped.
+**REFACTOR:** Keep validation and filtering in one loop. Values above 1000 are skipped; negatives are still rejected.
 
-**REFACTOR:** The negative check comes first. Negative numbers cannot be hidden by an upper-bound filter.
-
-## 10. A delimiter of any length — test 13
+## 14. Requirement 12 — Exactly 1000 counts (test 12)
 
 ```python
-def test_delimiter_of_any_length():
-    assert add("//[***]\n1***2***3") == 6
+def test_1000_is_included(self):
+    self.assertEqual(add("2,1000"), 1002)
 ```
 
-**Requirement:** A delimiter such as `***` can be wrapped in square brackets.
+**RED:** A mistaken `number < 1000` condition would return 2. **GREEN:** Use `<= 1000`. **REFACTOR:** This boundary test protects against off-by-one mistakes.
 
-**RED:** The single-character header parser treats the delimiter as `"[***]"`, which is not what separates the numbers.
-
-**GREEN:** Introduce Python's regular-expression module:
+## 15. Requirement 13 — Delimiter of any length (test 13)
 
 ```python
-import re
+def test_delimiter_of_any_length(self):
+    self.assertEqual(add("//[***]\n1***2***3"), 6)
+```
 
-delimiter_definition = header[2:]
+The bracketed `[***]` declares the delimiter `***`, not literal square brackets.
+
+**RED:** `header[2:]` alone produces `"[***]"`, which is not the separator in the body.
+
+**GREEN:** Introduce `import re` and extract bracketed delimiters:
+
+```python
 if delimiter_definition.startswith("["):
     delimiters = re.findall(r"\[([^\]]+)\]", delimiter_definition)
 else:
@@ -304,82 +301,65 @@ pattern = "|".join(re.escape(d) for d in delimiters)
 values = re.split(pattern, numbers)
 ```
 
-- `re.findall(...)` extracts the text **inside** each `[ ... ]`, e.g., `***`.
-- `re.escape("***")` makes `*` literal rather than a regex repetition operator.
-- `re.split(...)` divides the number string wherever a declared delimiter appears.
+`re.findall` extracts `***`; `re.escape` treats `*` as literal text; `re.split` splits using the regex pattern. **REFACTOR:** Generalize the splitter instead of duplicating the arithmetic.
 
-**REFACTOR:** Use **one list of delimiters** and **one `re.split` call**, rather than a different arithmetic path for each delimiter syntax.
-
-## 11. Multiple custom delimiters — test 14
+## 16. Requirement 14 — Multiple custom delimiters (test 14)
 
 ```python
-def test_multiple_custom_delimiters():
-    assert add("//[*][%]\n1*2%3") == 6
+def test_multiple_custom_delimiters(self):
+    self.assertEqual(add("//[*][%]\n1*2%3"), 6)
 ```
 
-**RED:** A solution that supports only one delimiter will leave an unsplit `%` or `*` token.
+**RED:** A one-delimiter-only parser cannot split both `*` and `%`. **GREEN:** `re.findall` returns `["*", "%"]`; joining escaped patterns with `|` means **either delimiter**. **REFACTOR:** Keep one regex-based splitter.
 
-**GREEN:** The new `re.findall(...)` already extracts **both** bracketed delimiters: `["*", "%"]`. Joining their escaped forms with `|` creates a regex choice: match one **or** the other.
-
-**REFACTOR:** Reuse the general delimiter list from test 13; no new summation logic required.
-
-## 12. Multiple delimiters with multiple characters — test 15
+## 17. Requirement 15 — Several delimiters of any length (test 15)
 
 ```python
-def test_multiple_delimiters_of_any_length():
-    assert add("//[**][%%]\n1**2%%3") == 6
+def test_multiple_delimiters_of_any_length(self):
+    self.assertEqual(add("//[**][%%]\n1**2%%3"), 6)
 ```
 
-**RED:** A naïve split on only `**` or only `%%` misses the other delimiter.
+**RED:** Hard-coding a one-character delimiter fails. **GREEN:** The regex list already handles `**` and `%%`. **REFACTOR:** In the final code, `sorted(delimiters, key=len, reverse=True)` tries longer delimiters first when one delimiter begins with another.
 
-**GREEN:** The same regex list approach supports both.
+## 18. Regression tests — tests 16–20
 
-**REFACTOR:** A single general splitting algorithm handles tests 13–15.
+These tests exercise edge cases and combinations of already implemented requirements. **In the earlier learning session, they passed when added**, so it would be inaccurate to invent a failing RED stage for them.
 
-## 13. Extra regression coverage — tests 16–20
+| # | Test method | Expected behavior | GREEN / REFACTOR significance |
+|---|---|---|---|
+| 16 | `test_zero` | `add("0") == 0` | Confirms a numeric zero works independently of empty input |
+| 17 | `test_only_numbers_above_1000` | `add("1001,2000") == 0` | Confirms filtering can skip every number |
+| 18 | `test_negative_number_with_custom_delimiter` | `add("//;\n1;-3;2")` raises `ValueError` mentioning `-3` | Confirms custom parsing still uses negative validation |
+| 19 | `test_long_delimiter_with_special_characters` | `add("//[***]\n10***20***30") == 60` | Confirms `re.escape` handles regex-special characters |
+| 20 | `test_multiple_delimiters_with_different_lengths` | `add("//[***][%]\n1***2%3") == 6` | Confirms multiple delimiters with different lengths |
 
-These validate boundaries and combinations already implied by the requirements. A **regression test** helps ensure later changes don't reintroduce an old bug.
+**RED:** No new failure occurred when these were added to the working solution. **GREEN:** No new implementation needed. **REFACTOR:** Their presence makes future refactoring safer by guarding existing behavior.
 
-| # | Test name | Input | Expected | Why it matters |
-|---|---|---|---|---|
-| 16 | `test_zero` | `"0"` | `0` | A real zero must not be confused with an empty input |
-| 17 | `test_only_numbers_above_1000` | `"1001,2000"` | `0` | Every large value is omitted |
-| 18 | `test_negative_number_with_custom_delimiter` | `"//;\n1;-3;2"` | `ValueError` mentioning `-3` | Negative validation works with custom splitting |
-| 19 | `test_long_delimiter_with_special_characters` | `"//[***]\n10***20***30"` | `60` | Repeated `*` is safely escaped in regex |
-| 20 | `test_multiple_delimiters_with_different_lengths` | `"//[***][%]\n1***2%3"` | `6` | Long and short separators coexist |
-
-**RED:** These tests are most valuable against a *broken or incomplete* implementation—for example, one that does not escape `*`, includes 1001, or skips validating negatives after a custom delimiter. By the time they were added in our session, the existing implementation **already passed** them. It would be inaccurate to say they failed first.
-
-**GREEN:** No change was needed; they confirmed implemented behavior.
-
-**REFACTOR:** None needed for those cases. They strengthened regression confidence.
-
-## 14. Newlines after a custom delimiter — test 21
+## 19. Requirement 21 — Newlines after custom headers
 
 ```python
-def test_custom_delimiter_with_newline():
-    assert add("//;\n1;2\n3") == 6
+def test_custom_delimiter_with_newline(self):
+    self.assertEqual(add("//;\n1;2\n3"), 6)
 ```
 
-**RED:** The earlier custom-header branch *replaced* the default delimiters with `[";"]`. The body `"1;2\n3"` left `"2\n3"` unsplit; converting it to an integer failed.
+**RED:** A custom-header implementation that sets `delimiters = [";"]` leaves `"2\n3"` unsplit, causing `ValueError`.
 
-**GREEN:** After parsing the declared delimiter(s), append newline:
+**GREEN:** After extracting custom delimiters, add:
 
 ```python
 delimiters.append("\n")
 ```
 
-**REFACTOR:** Keep the newline in the common delimiter list, regardless of which custom syntax the input used. In the current implementation, custom delimiters replace the comma default, but **newline is retained**. This distinction is worth remembering when explaining the code.
+**REFACTOR:** The common regex splitting logic now supports newline with custom delimiters. **Important:** The final code keeps newline but replaces comma when a custom header is present. That matches the 21 documented cases; other interpretations need a separate test and specification.
 
-## 15. The final `calculator.py` from GitHub
-
-This is the actual version reviewed on `main` (including the same behavior and whitespace):
+## 20. Final `calculator.py` explained
 
 ```python
 import re
 
 
 def add(numbers):
+    """Sum integers in a delimited string, following the String Calculator Kata."""
     if numbers == "":
         return 0
 
@@ -393,11 +373,11 @@ def add(numbers):
             delimiters = re.findall(r"\[([^\]]+)\]", delimiter_definition)
         else:
             delimiters = [delimiter_definition]
-        
+
         delimiters.append("\n")
 
-    pattern = "|".join(re.escape(delimiter) for delimiter in delimiters)
-
+    # Escape special regex characters; prefer longer delimiters if they overlap.
+    pattern = "|".join(re.escape(delimiter) for delimiter in sorted(delimiters, key=len, reverse=True))
     values = re.split(pattern, numbers)
 
     total = 0
@@ -405,141 +385,103 @@ def add(numbers):
 
     for value in values:
         number = int(value)
-
         if number < 0:
             negatives.append(number)
         elif number <= 1000:
             total += number
 
     if negatives:
-        negative_list = ",".join(str(n) for n in negatives)
+        negative_list = ",".join(str(number) for number in negatives)
         raise ValueError(f"negatives not allowed: {negative_list}")
 
     return total
 ```
 
-### Walk through a real call
+### Trace a real input
 
-Take `add("//[***][%]\n1***2%3")`:
+For `add("//[***][%]\n1***2%3")`:
 
-1. Input is not empty, so skip the first `return 0`.
-2. The input begins with `//`; split header from body at the first newline.
-3. `header = "//[***][%]"` and `numbers = "1***2%3"`.
-4. Remove the first two header characters: `delimiter_definition = "[***][%]"`.
-5. Extract bracketed delimiters: `["***", "%"]`.
-6. Add newline as an allowed delimiter: `["***", "%", "\n"]`.
-7. Escape regex-special characters, join options with `|`, then split.
-8. `values = ["1", "2", "3"]`.
-9. Start `total = 0` and `negatives = []`.
-10. Convert each token using `int(value)`; add 1, 2, then 3. None are negative or above 1000.
-11. Since `negatives` is empty, skip the exception.
-12. `return total` returns **6**.
+1. Not empty → continue.
+2. `startswith("//")` → yes; separate `header = "//[***][%]"` and `numbers = "1***2%3"`.
+3. `header[2:]` → `"[***][%]"`.
+4. `re.findall(...)` → `["***", "%"]`.
+5. Append `"\n"`; escape each delimiter and join them into a regex pattern.
+6. `re.split(...)` → `["1", "2", "3"]`.
+7. Convert each token to an integer. No negatives or values over 1000.
+8. Sum `1 + 2 + 3` → return **6**.
 
-### What each key Python tool contributes
+### Common Python concepts
 
-| Python syntax | Purpose |
+| Concept | Explanation |
 |---|---|
-| `def add(numbers):` | Define function and parameter |
-| `if` / `elif` | Branch based on conditions |
-| `return` | Send result to caller and end the function |
-| `startswith()` | Detect a custom delimiter header |
-| `split("\n", 1)` | Divide header from number body once |
-| `header[2:]` | Slice off the prefix `//` |
-| `re.findall(...)` | Extract one or several bracketed delimiters |
-| `re.escape(...)` | Treat regex-special delimiter characters literally |
-| `re.split(...)` | Split on any delimiter in the pattern |
-| `for value in values:` | Process each token |
-| `int(value)` | Convert numeric text to an integer |
-| `+=` | Update a running sum |
-| `append()` | Save each negative number |
-| `raise ValueError(...)` | Reject invalid negative input |
-| `pytest.raises(...)` | Assert that rejection happens |
+| `def` | Define a function |
+| `return` | End function and send value to caller |
+| `if` / `elif` | Conditional execution |
+| `split` | Break a string into parts |
+| `[2:]` | Slice off the first two characters |
+| `[]` | Create a list |
+| `for` | Iterate over items |
+| `int` | Convert numeric text to an integer |
+| `+=` | Add to the current total |
+| `append` | Add an item to a list |
+| `re.escape` | Make delimiter text safe for regex matching |
+| `re.split` | Split on several possible separators |
+| `raise` | Throw an exception |
+| `self.assertEqual` | Test value equality |
+| `self.assertRaisesRegex` | Test exception type and message |
 
-## 16. Test-by-test checklist in the actual repository order
+## 21. Test order in the actual `unittest` class
 
-| # | Test | Requirement |
+The methods are **written** in this requirement order, although `unittest` normally **executes test methods alphabetically by name**. The explanation below follows the written/learning order, not the console's execution order.
+
+| # | Test method | Requirement |
 |---|---|---|
 | 1 | `test_empty_string_returns_zero` | Empty input |
-| 2 | `test_single_number_returns_its_value` | One numeric string |
-| 3 | `test_two_numbers` | Two comma-separated numbers |
-| 4 | `test_multiple_numbers` | Any number of comma-separated values |
-| 5 | `test_newline_delimiter` | Mix newline and comma |
-| 6 | `test_multiple_newlines` | Multiple newline separators |
-| 7 | `test_custom_delimiter` | One custom separator `;` |
-| 8 | `test_custom_delimiter_with_multiple_numbers` | One custom separator `|` |
-| 9 | `test_single_negative_number` | Reject one negative |
-| 10 | `test_multiple_negative_numbers` | Report all negatives |
-| 11 | `test_numbers_greater_than_1000_are_ignored` | Skip values >1000 |
-| 12 | `test_1000_is_included` | Include exactly 1000 |
-| 13 | `test_delimiter_of_any_length` | Long bracketed delimiter |
-| 14 | `test_multiple_custom_delimiters` | More than one separator |
-| 15 | `test_multiple_delimiters_of_any_length` | Several long separators |
+| 2 | `test_single_number_returns_value` | One number |
+| 3 | `test_two_numbers` | Two numbers |
+| 4 | `test_multiple_numbers` | Many numbers |
+| 5 | `test_newline_delimiter` | Comma and newline |
+| 6 | `test_multiple_newlines` | Repeated newline |
+| 7 | `test_custom_delimiter` | Semicolon |
+| 8 | `test_custom_delimiter_with_multiple_numbers` | Pipe |
+| 9 | `test_single_negative_number` | One negative exception |
+| 10 | `test_multiple_negative_numbers` | All negative values |
+| 11 | `test_numbers_greater_than_1000_are_ignored` | Ignore >1000 |
+| 12 | `test_1000_is_included` | Include 1000 |
+| 13 | `test_delimiter_of_any_length` | Long bracket delimiter |
+| 14 | `test_multiple_custom_delimiters` | Multiple separators |
+| 15 | `test_multiple_delimiters_of_any_length` | Multiple long separators |
 | 16 | `test_zero` | Zero boundary |
-| 17 | `test_only_numbers_above_1000` | All values skipped |
-| 18 | `test_negative_number_with_custom_delimiter` | Negative with custom separator |
-| 19 | `test_long_delimiter_with_special_characters` | Regex-special delimiter |
-| 20 | `test_multiple_delimiters_with_different_lengths` | Mixed-length separators |
-| 21 | `test_custom_delimiter_with_newline` | Preserve newline with custom header |
+| 17 | `test_only_numbers_above_1000` | All ignored |
+| 18 | `test_negative_number_with_custom_delimiter` | Combined negative/custom |
+| 19 | `test_long_delimiter_with_special_characters` | Regex escaping |
+| 20 | `test_multiple_delimiters_with_different_lengths` | Mixed lengths |
+| 21 | `test_custom_delimiter_with_newline` | Newline with custom |
 
-## 17. How to run and troubleshoot
+## 22. Troubleshooting and Git workflow
 
-From your Mac's project root:
+**Typical failures:**
 
-```bash
-source .venv/bin/activate
-python -m pytest -v
-```
+- `ImportError`: `add` not defined or incorrect import.
+- `AssertionError: 0 != 5`: actual result differs from expected.
+- `ValueError: invalid literal for int()`: the delimiter was not split correctly or the input is malformed.
+- `SyntaxError: 'return' outside function`: incorrect indentation.
+- `self.assertRaisesRegex` fails: no exception, wrong exception type, or message does not match.
+- `git diff --check` reports trailing whitespace: formatting cleanup needed; tests can still pass.
 
-Expected, based on your verified terminal run:
+**Unspecified cases:** The 21 tests do not define behavior for malformed input such as `"1,,2"`, missing custom headers, or empty bracketed delimiters. Don't claim those cases are supported without additional tests.
 
-```text
-collected 21 items
-...
-21 passed
-```
-
-**Common errors:**
-
-- **`ImportError: cannot import name 'add'`:** the function is missing from `calculator.py`, or named differently.
-- **`assert None == 0`:** a function with only `pass` or no explicit return returns `None`.
-- **`assert 0 == 5`:** the implementation returns the wrong number; this is a *test assertion failure*.
-- **`ValueError: invalid literal for int()`:** an input token still contains delimiter characters, or is not a valid integer.
-- **`SyntaxError: 'return' outside function`:** incorrect indentation.
-- **`git diff --check` reports trailing whitespace:** there are spaces at the end of lines. It is a formatting problem, not a test failure.
-
-Your earlier `git diff --check` detected trailing whitespace but **did not prevent the commit**. The code was committed and pushed. A later cleanup commit could remove these spaces without changing behavior.
-
-## 18. Practical TDD reflection
-
-A test proves **the behavior it asserts**, not every possible input. For example, a test for `add("1,2")` does not establish that `add("1\n2")` works, or that all negative numbers are reported.
-
-Our development process followed this growing pattern:
-
-```text
-empty → single → multiple → newlines → custom delimiters
-→ negative validation → ignore >1000 → long/multiple delimiters
-→ regression coverage → newline with custom delimiter
-```
-
-The first tests forced visible code changes. Some late tests passed immediately because we had already implemented the behavior. That is still useful regression coverage, but it is **not a fresh RED stage**.
-
-**Known boundaries of the current code:** It assumes well-formed headers and valid integer tokens; it does not define friendly behavior for malformed input such as `"1,,2"` or an empty bracket delimiter. Overlapping delimiters may need longest-first ordering. These were not covered by the 21 tests, so do not promise behavior you haven't verified. A custom header currently preserves newline but not the default comma; whether comma should remain allowed is a separate specification decision.
-
-## 19. How to explain your work to another developer
-
-> “I used Python and pytest to build the String Calculator through TDD. I started with a failing empty-input test. At first pytest had an import error; after defining a stub, I got a proper failing assertion, `None == 0`. I made the simplest solution return 0. Then each additional test drove more behavior: parsing a single integer, splitting several values, supporting newline and custom separators, rejecting all negative numbers, ignoring values above 1000, and handling multiple long delimiters through escaped regular expressions. I re-ran all existing tests after changes to check for regressions. The final suite has 21 passing tests.” 
-
-## 20. Git workflow — sync documentation to your Mac
-
-This Markdown file is committed directly to GitHub's `main` branch. On your existing local clone run:
+To sync your Mac with the GitHub updates:
 
 ```bash
 git status
 git pull --ff-only origin main
+python -m unittest discover -s tests -p "test_*.py" -v
 code TDD_WALKTHROUGH.md
-python -m pytest -v
 ```
 
-If `git status` shows uncommitted local changes, review them before pulling. `--ff-only` avoids an accidental merge commit.
+If `git status` shows uncommitted local changes, save or review them before pulling.
 
-**Remember:** RED proves the new requirement isn't satisfied; GREEN satisfies it with minimal code; REFACTOR keeps the behavior but improves design. **All three steps are supported by running the test suite.**
+## 23. Short presentation script
+
+> “I changed the Kata to Python's built-in `unittest` framework. I group the tests in `TestCalculator(unittest.TestCase)` and use `self.assertEqual` for normal results and `self.assertRaisesRegex` for negative-number exceptions. I followed the TDD idea of writing a test, seeing the expected failure, making it pass, and simplifying the code. I started with an empty string and a single number, then added multiple numbers, newline and custom delimiters, negative validation, the 1000 boundary, and bracketed multiple delimiters. The final implementation uses `re.split` for general delimiter parsing, and the 21 tests protect those requirements from regressions.” 
