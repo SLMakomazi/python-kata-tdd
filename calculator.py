@@ -1,40 +1,41 @@
+
 import re
 
 
 def add(numbers):
-    """Sum integers in a delimited string, following the String Calculator Kata."""
+    # LESSON 1: Empty string
     if numbers == "":
         return 0
 
+    # LESSON 2: Default comma and newline delimiters
     delimiters = [",", "\n"]
 
+    # LESSON 3: Custom delimiters
     if numbers.startswith("//"):
         header, numbers = numbers.split("\n", 1)
-        delimiter_definition = header[2:]
+        definition = header[2:]
 
-        if delimiter_definition.startswith("["):
-            delimiters = re.findall(r"\[([^\]]+)\]", delimiter_definition)
+        # LESSON 5: Advanced delimiters
+        if definition.startswith("["):
+            delimiters = re.findall(r"\[([^\]]+)\]", definition)
         else:
-            delimiters = [delimiter_definition]
+            delimiters = [definition]
 
         delimiters.append("\n")
 
-    # Escape special regex characters; prefer longer delimiters if they overlap.
-    pattern = "|".join(re.escape(delimiter) for delimiter in sorted(delimiters, key=len, reverse=True))
-    values = re.split(pattern, numbers)
+    # LESSON 5: Build a pattern for all delimiters
+    delimiters.sort(key=len, reverse=True)
+    pattern = "|".join(re.escape(d) for d in delimiters)
 
-    total = 0
-    negatives = []
+    # LESSON 2: Split and convert numbers
+    values = [int(n) for n in re.split(pattern, numbers)]
 
-    for value in values:
-        number = int(value)
-        if number < 0:
-            negatives.append(number)
-        elif number <= 1000:
-            total += number
+    # LESSON 4: Find negative numbers
+    negatives = [n for n in values if n < 0]
 
     if negatives:
-        negative_list = ",".join(str(number) for number in negatives)
-        raise ValueError(f"negatives not allowed: {negative_list}")
+        message = ",".join(str(n) for n in negatives)
+        raise ValueError(f"negatives not allowed: {message}")
 
-    return total
+    # LESSON 4: Ignore numbers greater than 1000
+    return sum(n for n in values if n <= 1000)
